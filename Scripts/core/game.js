@@ -83,6 +83,7 @@ function init() {
     textureGrass.wrapS = RepeatWrapping;
     textureGrass.wrapT = RepeatWrapping;
     textureGrass.repeat.set(4, 4);
+    console.log("Loaded Grass Texture...");
     //Add a Plane to the Scene
     planeGeometry = new THREE.PlaneGeometry(1000, 200, 20, 20);
     planeMaterial = new THREE.MeshLambertMaterial({ map: textureGrass });
