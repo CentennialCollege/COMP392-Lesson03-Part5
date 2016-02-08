@@ -16,18 +16,22 @@ var CameraHelper = THREE.CameraHelper;
 var LambertMaterial = THREE.MeshLambertMaterial;
 var MeshBasicMaterial = THREE.MeshBasicMaterial;
 var Material = THREE.Material;
+var Texture = THREE.Texture;
+var RepeatWrapping = THREE.RepeatWrapping;
 var Mesh = THREE.Mesh;
 var Object3D = THREE.Object3D;
 var SpotLight = THREE.SpotLight;
 var PointLight = THREE.PointLight;
 var AmbientLight = THREE.AmbientLight;
 var DirectionalLight = THREE.DirectionalLight;
+var HemisphereLight = THREE.HemisphereLight;
 var Control = objects.Control;
 var GUI = dat.GUI;
 var Color = THREE.Color;
 var Vector3 = THREE.Vector3;
 var Face3 = THREE.Face3;
 var Point = objects.Point;
+var Fog = THREE.Fog;
 //Custom Game Objects
 var gameObject = objects.gameObject;
 var scene;
@@ -45,6 +49,7 @@ var spotLight1;
 var directionalLight;
 var pointColour;
 var pointLight;
+var hemiLight;
 var control;
 var gui;
 var stats;
@@ -62,19 +67,26 @@ var sphereGeometry;
 var sphereLight;
 var sphereLightMaterial;
 var sphereLightMesh;
+var textureGrass;
 function init() {
     // Instantiate a new Scene object
     scene = new Scene();
+    scene.fog = new Fog(0xaaaaaa, 0.010, 200);
     setupRenderer(); // setup the default renderer
     setupCamera(); // setup the camera
     // add an axis helper to the scene
     axes = new AxisHelper(20);
     scene.add(axes);
     console.log("Added Axis Helper to scene...");
+    // create the ground plane
+    textureGrass = THREE.ImageUtils.loadTexture("Assets/textures/ground/grasslight-big.jpg");
+    textureGrass.wrapS = RepeatWrapping;
+    textureGrass.wrapT = RepeatWrapping;
+    textureGrass.repeat.set(4, 4);
     //Add a Plane to the Scene
-    planeGeometry = new THREE.PlaneGeometry(600, 200, 20, 20);
-    planeMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    plane = new gameObject(planeGeometry, planeMaterial, 15, -5, 0);
+    planeGeometry = new THREE.PlaneGeometry(1000, 200, 20, 20);
+    planeMaterial = new THREE.MeshLambertMaterial({ map: textureGrass });
+    plane = new gameObject(planeGeometry, planeMaterial, 15, 0, 0);
     plane.rotation.x = -0.5 * Math.PI;
     scene.add(plane);
     console.log("Added Plane Primitive to scene...");
@@ -85,9 +97,9 @@ function init() {
     scene.add(cube);
     console.log("Added Cube Primitive to the Scene");
     // Add a Sphere to the Scene
-    sphereGeometry = new SphereGeometry(4, 20, 20);
+    sphereGeometry = new SphereGeometry(4, 25, 25);
     sphereMaterial = new LambertMaterial({ color: 0x7777ff });
-    sphere = new gameObject(sphereGeometry, sphereMaterial, 20, 0, 2);
+    sphere = new gameObject(sphereGeometry, sphereMaterial, 10, 5, 10);
     scene.add(sphere);
     console.log("Add a Sphere Primitive");
     // Add an AmbientLight to the scene
@@ -103,35 +115,34 @@ function init() {
     console.log("Added Spot Light 0 to Scene");
     target = new Object3D();
     target.position = new Vector3(5, 0, 0);
+    // Add a HemisphereLight
+    hemiLight = new HemisphereLight(0x0000ff, 0x00ff00, 0.6);
+    hemiLight.position.set(0, 500, 0);
+    hemiLight.visible = false;
+    scene.add(hemiLight);
+    console.log("Added Hemisphere Light to Scene");
     // Add a PointLight to the scene
-    pointColour = "#ff5808";
+    pointColour = "#ffffff";
     directionalLight = new DirectionalLight(pointColour);
-    directionalLight.position.set(-40, 60, -10);
+    directionalLight.position.set(30, 10, -50);
     directionalLight.castShadow = true;
+    directionalLight.shadowCameraNear = 0.1;
+    directionalLight.shadowCameraFar = 100;
+    directionalLight.shadowCameraFov = 50;
+    directionalLight.target = plane;
     directionalLight.shadowCameraNear = 2;
     directionalLight.shadowCameraFar = 200;
-    directionalLight.shadowCameraLeft = -50;
-    directionalLight.shadowCameraRight = 50;
-    directionalLight.shadowCameraTop = 50;
-    directionalLight.shadowCameraBottom = -50;
-    directionalLight.intensity = 0;
-    directionalLight.shadowMapHeight = 1024;
-    directionalLight.shadowMapWidth = 1024;
+    directionalLight.shadowCameraLeft = -100;
+    directionalLight.shadowCameraRight = 100;
+    directionalLight.shadowCameraTop = 100;
+    directionalLight.shadowCameraBottom = -100;
+    directionalLight.shadowMapWidth = 2048;
+    directionalLight.shadowMapHeight = 2048;
     scene.add(directionalLight);
     console.log("Added Directional Light to Scene");
-    // add the camera helper object to show debug information
-    directionalLightHelper = new CameraHelper(directionalLight.shadow.camera);
-    // Add a small sphere simulating the pointLight
-    sphereLight = new SphereGeometry(0.2);
-    sphereLightMaterial = new MeshBasicMaterial({ color: 0xac6c25 });
-    sphereLightMesh = new Mesh(sphereLight, sphereLightMaterial);
-    sphereLightMesh.castShadow = true;
-    sphereLightMesh.position = new Vector3(3, 20, 3);
-    scene.add(sphereLightMesh);
-    console.log("Added a Sphere Light to Scene");
     // add controls
     gui = new GUI();
-    control = new Control(0.03, 0.03, ambientColour, pointColour, 0.5, 0, 30, 0.1, false, true, false, "Plane");
+    control = new Control(0.03, 0.03, false, 0x00ff00, 0x0000ff, 0.6);
     addControl(control);
     // Add framerate stats
     addStatsObject();
@@ -149,39 +160,17 @@ function onResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 function addControl(controlObject) {
-    gui.addColor(controlObject, 'ambientColour').onChange(function (color) {
-        ambientLight.color = new Color(color);
+    gui.add(controlObject, 'hemisphere').onChange(function (flag) {
+        hemiLight.visible = flag;
     });
-    gui.addColor(controlObject, 'pointColour').onChange(function (color) {
-        directionalLight.color = new Color(color);
+    gui.addColor(controlObject, 'groundColour').onChange(function (color) {
+        hemiLight.groundColor = new Color(color);
+    });
+    gui.addColor(controlObject, 'skyColour').onChange(function (color) {
+        hemiLight.color = new Color(color);
     });
     gui.add(controlObject, 'intensity', 0, 5).onChange(function (intensity) {
-        directionalLight.intensity = intensity;
-    });
-    gui.add(controlObject, 'debug').onChange(function (flag) {
-        if (flag) {
-            scene.add(directionalLightHelper);
-        }
-        else {
-            scene.remove(directionalLightHelper);
-        }
-    });
-    gui.add(controlObject, 'castShadow').onChange(function (flag) {
-        directionalLight.castShadow = flag;
-    });
-    gui.add(controlObject, 'target', ['Plane', 'Sphere', 'Cube']).onChange(function (target) {
-        console.log(target);
-        switch (target) {
-            case "Plane":
-                directionalLight.target = plane;
-                break;
-            case "Sphere":
-                directionalLight.target = sphere;
-                break;
-            case "Cube":
-                directionalLight.target = cube;
-                break;
-        }
+        hemiLight.intensity = intensity;
     });
 }
 // Add Stats Object to the Scene
@@ -204,12 +193,6 @@ function gameLoop() {
     step += control.bouncingSpeed;
     sphere.position.x = 20 + (10 * (Math.cos(step)));
     sphere.position.y = 2 + (10 * Math.abs(Math.sin(step)));
-    // move the light simulation
-    sphereLightMesh.position.z = -8;
-    sphereLightMesh.position.y = +(27 * (Math.sin(step / 3)));
-    sphereLightMesh.position.x = 10 + (26 * (Math.cos(step / 3)));
-    //move pointLight along with SphereLightMesh
-    directionalLight.position.set(sphereLightMesh.position.x, sphereLightMesh.position.y, sphereLightMesh.position.z);
     // render using requestAnimationFrame
     requestAnimationFrame(gameLoop);
     // render the scene
@@ -226,9 +209,9 @@ function setupRenderer() {
 // Setup main camera for the scene
 function setupCamera() {
     camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.x = -35;
-    camera.position.y = 30;
-    camera.position.z = 25;
+    camera.position.x = -20;
+    camera.position.y = 15;
+    camera.position.z = 45;
     camera.lookAt(new Vector3(10, 0, 0));
     console.log("Finished setting up Initial Camera...");
 }
